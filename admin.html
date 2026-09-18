@@ -1,1 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EKO DIGITAL — Admin Panel</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f4f6f8;
+      color: #17202a;
+    }
+    .topbar {
+      background: #111827;
+      color: white;
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand { font-size: 20px; font-weight: 700; }
+    .badge {
+      font-size: 12px;
+      background: #374151;
+      padding: 6px 9px;
+      border-radius: 999px;
+    }
+    .wrap { max-width: 1050px; margin: 24px auto; padding: 0 16px; }
+    .card {
+      background: white;
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 18px;
+      box-shadow: 0 4px 18px rgba(0,0,0,.06);
+    }
+    h1, h2 { margin-top: 0; }
+    h1 { font-size: 25px; }
+    h2 { font-size: 18px; }
+    label { display: block; font-weight: 600; margin: 12px 0 6px; }
+    input, textarea, select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 9px;
+      font: inherit;
+      background: white;
+    }
+    textarea { min-height: 100px; resize: vertical; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      gap: 14px;
+    }
+    button {
+      border: 0;
+      border-radius: 9px;
+      padding: 11px 15px;
+      font-weight: 700;
+      cursor: pointer;
+      background: #111827;
+      color: white;
+      margin-top: 14px;
+    }
+    button.secondary { background: #e5e7eb; color: #111827; }
+    button.danger { background: #b91c1c; }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    .hidden { display: none !important; }
+    .notice {
+      padding: 11px 13px;
+      border-radius: 9px;
+      margin-top: 12px;
+      background: #eef2ff;
+      color: #3730a3;
+      white-space: pre-wrap;
+    }
+    .error { background: #fee2e2; color: #991b1b; }
+    .success { background: #dcfce7; color: #166534; }
+    .row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .product {
+      border: 1px solid #e5e7eb;
+      padding: 14px;
+      border-radius: 10px;
+      margin-top: 10px;
+    }
+    .product strong { display: block; margin-bottom: 5px; }
+    .muted { color: #6b7280; font-size: 13px; }
+    @media (max-width: 700px) {
+      .grid { grid-template-columns: 1fr; }
+      .topbar { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">EKO DIGITAL — Admin Panel</div>
+    <div class="badge" id="statusBadge">Not connected</div>
+  </div>
 
+  <main class="wrap">
+    <section id="setupCard" class="card">
+      <h1>Connect your Supabase project</h1>
+      <p class="muted">
+        Enter your Supabase project URL and anon/publishable key. These values are saved only
+        in this browser. Do not put a Supabase service-role key here.
+      </p>
+
+      <label for="supabaseUrl">Supabase Project URL</label>
+      <input id="supabaseUrl" type="url" placeholder="https://your-project.supabase.co">
+
+      <label for="supabaseKey">Supabase anon / publishable key</label>
+      <input id="supabaseKey" type="password" placeholder="eyJ...">
+
+      <div class="row">
+        <button id="connectBtn">Connect</button>
+        <button id="clearConfigBtn" class="secondary">Clear saved connection</button>
+      </div>
+      <div id="setupMessage"></div>
+    </section>
+
+    <section id="adminCard" class="hidden">
+      <div class="card">
+        <h1>Dashboard</h1>
+        <p id="connectionText" class="muted"></p>
+        <div class="row">
+          <button id="refreshBtn">Refresh products</button>
+          <button id="logoutBtn" class="secondary">Disconnect</button>
+        </div>
+        <div id="dashboardMessage"></div>
+      </div>
+
+      <div class="card">
+        <h2>Add Product</h2>
+        <div class="grid">
+          <div>
+            <label for="productName">Product name</label>
+            <input id="productName" placeholder="e.g. HP EliteBook 840 G8">
+          </div>
+          <div>
+            <label for="productPrice">Price</label>
+            <input id="productPrice" type="number" min="0" step="0.01" placeholder="350000">
+          </div>
+        </div>
+
+        <label for="productImage">Image URL</label>
+        <input id="productImage" type="url" placeholder="https://...">
+
+        <label for="productDescription">Description</label>
+        <textarea id="productDescription" placeholder="Product details..."></textarea>
+
+        <button id="addProductBtn">Add Product</button>
+        <div id="addMessage"></div>
+      </div>
+
+      <div class="card">
+        <h2>Products</h2>
+        <p class="muted">
+          This panel expects a Supabase table named <strong>products</strong> with columns:
+          <code>id</code>, <code>name</code>, <code>price</code>, <code>image_url</code>, and
+          <code>description</code>. If your table uses different names, tell me and I'll adjust the file.
+        </p>
+        <div id="productsList">
+          <p class="muted">Connect to load products.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // EKO DIGITAL admin panel
+    // Uses the Supabase REST API directly, so no external JavaScript library is required.
+    let config = {
+      url: localStorage.getItem("eko_supabase_url") || "",
+      key: localStorage.getItem("eko_supabase_key") || ""
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    $("supabaseUrl").value = config.url;
+    $("supabaseKey").value = config.key;
+
+    function message(target, text, type = "") {
+      target.innerHTML = text
+        ? '<div class="notice ' + type + '">' + escapeHtml(text) + '</div>'
+        : "";
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function validConfig() {
+      return /^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/.test(config.url);
+    }
+
+    async function supabaseRequest(path, options = {}) {
+      if (!validConfig() || !config.key) {
+        throw new Error("Supabase connection details are missing or invalid.");
+      }
+
+      const response = await fetch(config.url.replace(/\/$/, "") + "/rest/v1/" + path, {
+        ...options,
+        headers: {
+          "apikey": config.key,
+          "Authorization": "Bearer " + config.key,
+          "Content-Type": "application/json",
+          "Prefer": options.prefer || "return=representation",
+          ...(options.headers || {})
+        }
+      });
+
+      const text = await response.text();
+      let data = null;
+      try { data = text ? JSON.parse(text) : null; } catch (_) {}
+
+      if (!response.ok) {
+        const detail = data?.message || data?.hint || data?.details || text || response.statusText;
+        throw new Error(detail);
+      }
+      return data;
+    }
+
+    async function connect() {
+      config.url = $("supabaseUrl").value.trim().replace(/\/$/, "");
+      config.key = $("supabaseKey").value.trim();
+
+      if (!validConfig()) {
+        message($("setupMessage"), "Please enter a valid Supabase project URL.", "error");
+        return;
+      }
+      if (!config.key) {
+        message($("setupMessage"), "Please enter your Supabase anon/publishable key.", "error");
+        return;
+      }
+
+      localStorage.setItem("eko_supabase_url", config.url);
+      localStorage.setItem("eko_supabase_key", config.key);
+
+      $("connectBtn").disabled = true;
+      message($("setupMessage"), "Testing connection...");
+
+      try {
+        // A small request to the products endpoint verifies the URL/key and table access.
+        await supabaseRequest("products?select=*&limit=1");
+        showAdmin();
+        message($("setupMessage"), "Connected successfully.", "success");
+        await loadProducts();
+      } catch (error) {
+        message($("setupMessage"), "Connection failed: " + error.message, "error");
+      } finally {
+        $("connectBtn").disabled = false;
+      }
+    }
+
+    function showAdmin() {
+      $("adminCard").classList.remove("hidden");
+      $("statusBadge").textContent = "Connected";
+      $("connectionText").textContent = "Connected to " + config.url;
+    }
+
+    function disconnect() {
+      config = { url: "", key: "" };
+      localStorage.removeItem("eko_supabase_url");
+      localStorage.removeItem("eko_supabase_key");
+      $("supabaseUrl").value = "";
+      $("supabaseKey").value = "";
+      $("adminCard").classList.add("hidden");
+      $("statusBadge").textContent = "Not connected";
+      message($("setupMessage"), "Connection cleared.", "success");
+    }
+
+    async function loadProducts() {
+      message($("dashboardMessage"), "Loading products...");
+      try {
+        const products = await supabaseRequest(
+          "products?select=*&order=id.desc"
+        );
+
+        const list = $("productsList");
+        if (!products || products.length === 0) {
+          list.innerHTML = '<p class="muted">No products found.</p>';
+        } else {
+          list.innerHTML = products.map(p => `
+            <div class="product">
+              <strong>${escapeHtml(p.name ?? "Unnamed product")}</strong>
+              <div>Price: ${escapeHtml(p.price ?? "")}</div>
+              ${p.image_url ? `<div class="muted">Image: ${escapeHtml(p.image_url)}</div>` : ""}
+              ${p.description ? `<p>${escapeHtml(p.description)}</p>` : ""}
+              <button class="danger" data-delete="${escapeHtml(p.id)}">Delete</button>
+            </div>
+          `).join("");
+
+          list.querySelectorAll("[data-delete]").forEach(btn => {
+            btn.addEventListener("click", () => deleteProduct(btn.dataset.delete));
+          });
+        }
+        message($("dashboardMessage"), "Products refreshed.", "success");
+      } catch (error) {
+        message($("dashboardMessage"),
+          "Could not load products. " + error.message,
+          "error");
+      }
+    }
+
+    async function addProduct() {
+      const name = $("productName").value.trim();
+      const price = $("productPrice").value;
+      const image_url = $("productImage").value.trim();
+      const description = $("productDescription").value.trim();
+
+      if (!name) {
+        message($("addMessage"), "Enter a product name.", "error");
+        return;
+      }
+
+      $("addProductBtn").disabled = true;
+      message($("addMessage"), "Adding product...");
+
+      try {
+        await supabaseRequest("products", {
+          method: "POST",
+          body: JSON.stringify({
+            name,
+            price: price === "" ? null : Number(price),
+            image_url: image_url || null,
+            description: description || null
+          })
+        });
+
+        $("productName").value = "";
+        $("productPrice").value = "";
+        $("productImage").value = "";
+        $("productDescription").value = "";
+
+        message($("addMessage"), "Product added successfully.", "success");
+        await loadProducts();
+      } catch (error) {
+        message($("addMessage"), "Could not add product. " + error.message, "error");
+      } finally {
+        $("addProductBtn").disabled = false;
+      }
+    }
+
+    async function deleteProduct(id) {
+      if (!confirm("Delete this product?")) return;
+
+      try {
+        await supabaseRequest("products?id=eq." + encodeURIComponent(id), {
+          method: "DELETE",
+          prefer: "return=minimal"
+        });
+        await loadProducts();
+      } catch (error) {
+        message($("dashboardMessage"), "Could not delete product. " + error.message, "error");
+      }
+    }
+
+    $("connectBtn").addEventListener("click", connect);
+    $("clearConfigBtn").addEventListener("click", disconnect);
+    $("logoutBtn").addEventListener("click", disconnect);
+    $("refreshBtn").addEventListener("click", loadProducts);
+    $("addProductBtn").addEventListener("click", addProduct);
+
+    if (config.url && config.key) {
+      connect();
+    }
+  </script>
+</body>
+</html>
